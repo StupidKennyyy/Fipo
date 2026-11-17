@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # --- HALDUSTSOON (mgmt_net: 172.30.10.0/24) ---
+  
+  hq-controller:
+    image: ubuntu:24.04
+    container_name: hq-controller
+    hostname: hq-controller
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./cmdb-dashboard:/var/www/html
+    networks:
+      mgmt_net:
+        ipv4_address: 172.30.10.10
+      corp_net:
+        ipv4_address: 172.30.20.5
+      dmz_iot:
+        ipv4_address: 172.30.30.5
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y ansible nginx openssh-client sshpass osquery &&
+      sed -i 's/80/8080/g' /etc/nginx/sites-available/default &&
+      service nginx start &&
+      tail -f /dev/null"
+
+  backup-vault:
+    image: debian:12
+    container_name: backup-vault
+    hostname: backup-vault
+    volumes:
+      - backup_data:/backups
+    networks:
+      mgmt_net:
+        ipv4_address: 172.30.10.20
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server rsync gpg borgbackup &&
+      mkdir -p /var/run/sshd /backups &&
+      /usr/sbin/sshd -D"
+
+
+  # --- KONTORITSOON (corp_net: 172.30.20.0/24) ---
+
+  ws-dev-01:
+    image: ubuntu:24.04
+    container_name: ws-dev-01
+    hostname: ws-dev-01
+    networks:
+      corp_net:
+        ipv4_address: 172.30.20.10
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo git python3 vim htop &&
+      mkdir -p /var/run/sshd &&
+      /usr/sbin/sshd -D"
+
+  ws-fin-01:
+    image: ubuntu:24.04
+    container_name: ws-fin-01
+    hostname: ws-fin-01
+    networks:
+      corp_net:
+        ipv4_address: 172.30.20.11
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo &&
+      mkdir -p /var/run/sshd /opt/finance_docs &&
+      /usr/sbin/sshd -D"
+
+  srv-app-01:
+    image: rockylinux:9
+    container_name: srv-app-01
+    hostname: srv-app-01
+    networks:
+      corp_net:
+        ipv4_address: 172.30.20.20
+    command: >
+      bash -c "dnf install -y openssh-server sudo python3 &&
+      ssh-keygen -A &&
+      /usr/sbin/sshd -D"
+
+
+  # --- PIIRATUD TSOON (dmz_iot: 172.30.30.0/24) ---
+
+  kiosk-lobby:
+    image: debian:12
+    container_name: kiosk-lobby
+    hostname: kiosk-lobby
+    networks:
+      dmz_iot:
+        ipv4_address: 172.30.30.10
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server python3 &&
+      useradd -m -s /bin/bash kioskuser &&
+      mkdir -p /var/run/sshd &&
+      /usr/sbin/sshd -D"
+
+  iot-sensor-1:
+    image: alpine:latest
+    container_name: iot-sensor-1
+    hostname: iot-sensor-1
+    networks:
+      dmz_iot:
+        ipv4_address: 172.30.30.20
+    command: >
+      sh -c "apk add --no-cache openssh python3 &&
+      ssh-keygen -A &&
+      /usr/sbin/sshd &&
+      while true; do echo \"$$(date '+%Y-%m-%d %H:%M:%S') - TEMP: $$((20 + RANDOM % 10)).$$((RANDOM % 10)) C\" >> /var/log/sensor.log; sleep 60; done"
+
+  iot-cam-1:
+    image: debian:bookworm-slim
+    container_name: iot-cam-1
+    hostname: iot-cam-1
+    networks:
+      dmz_iot:
+        ipv4_address: 172.30.30.21
+    command: >
+      bash -c "apt-get update && 
+      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server python3 &&
+      mkdir -p /var/run/sshd &&
+      echo 'root:admin123' | chpasswd &&
+      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+      /usr/sbin/sshd -D"
+
+networks:
+  mgmt_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  corp_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.20.0/24
+  dmz_iot:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.30.0/24
+
+volumes:
+  backup_data:
