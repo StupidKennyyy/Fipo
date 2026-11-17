@@ -1,4 +1,4 @@
-Projektis on docker-compose fail, milles on 8 erinevat docker image-t.
+Projektis on kasutatud "pildid" ja nende kasutused
 
 
 
