@@ -1,0 +1,1 @@
+Tegemist on elu tammsaare pargis oleva firma ettevottena
