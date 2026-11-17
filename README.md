@@ -2,13 +2,13 @@ Projekt on mõeldud lihtsa firma klientseadmete pargi ehitamine, tsentraalne hal
 
 
 
-Ülespanemiseks saab kasutada docker-compose (https://docs.docker.com/compose/)
+Ülespanemiseks saab kasutada 'docker compose' (https://docs.docker.com/compose/)
 
 
 
-Kasutades docker-compose ehitab see projekti kaustas oleva docker-compose.yml
+Kasutades 'docker compose' ehitab see projekti kaustas oleva docker-compose.yml
 
-(Saab kasutada ka lihtsalt docker compose, kui docker-compose ei tööta.)
+(Saab kasutada ka lihtsalt 'docker-compose', kui 'docker compose' ei tööta.)
 
 
 
