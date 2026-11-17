@@ -1,16 +1,34 @@
-version: '3.8'
 
 services:
-  # --- HALDUSTSOON (mgmt_net: 172.30.10.0/24) ---
-  
+  # ==========================================
+  # HQ CONTROLLER
+  # ==========================================
   hq-controller:
     image: ubuntu:24.04
     container_name: hq-controller
     hostname: hq-controller
+    environment:
+      SSH_ROLE: controller
     ports:
       - "8080:8080"
     volumes:
       - ./cmdb-dashboard:/var/www/html
+      - ./hosts.ini:/etc/ansible/hosts:ro
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      ansible
+      nginx
+      openssh-server
+      openssh-client
+      sshpass
+      python3 &&
+      sed -i 's/listen 80 default_server;/listen 8080 default_server;/' /etc/nginx/sites-available/default &&
+      sed -i 's/listen \[::\]:80 default_server;/listen [::]:8080 default_server;/' /etc/nginx/sites-available/default &&
+      nginx &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       mgmt_net:
         ipv4_address: 172.30.10.10
@@ -18,130 +36,206 @@ services:
         ipv4_address: 172.30.20.5
       dmz_iot:
         ipv4_address: 172.30.30.5
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y ansible nginx openssh-client sshpass osquery &&
-      sed -i 's/80/8080/g' /etc/nginx/sites-available/default &&
-      service nginx start &&
-      tail -f /dev/null"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
+  # ==========================================
+  # BACKUP VAULT
+  # ==========================================
   backup-vault:
     image: debian:12
     container_name: backup-vault
     hostname: backup-vault
+    environment:
+      SSH_ROLE: worker
     volumes:
       - backup_data:/backups
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      openssh-server
+      openssh-client
+      rsync
+      gpg
+      borgbackup
+      python3 &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       mgmt_net:
         ipv4_address: 172.30.10.20
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server rsync gpg borgbackup &&
-      mkdir -p /var/run/sshd /backups &&
-      /usr/sbin/sshd -D"
 
-
-  # --- KONTORITSOON (corp_net: 172.30.20.0/24) ---
-
+  # ==========================================
+  # WORKSTATION - DEVELOPMENT
+  # ==========================================
   ws-dev-01:
     image: ubuntu:24.04
     container_name: ws-dev-01
     hostname: ws-dev-01
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      openssh-server
+      openssh-client
+      sudo
+      git
+      python3
+      vim
+      htop &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       corp_net:
         ipv4_address: 172.30.20.10
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo git python3 vim htop &&
-      mkdir -p /var/run/sshd &&
-      /usr/sbin/sshd -D"
 
+  # ==========================================
+  # WORKSTATION - FINANCE
+  # ==========================================
   ws-fin-01:
     image: ubuntu:24.04
     container_name: ws-fin-01
     hostname: ws-fin-01
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      openssh-server
+      openssh-client
+      sudo
+      python3 &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       corp_net:
         ipv4_address: 172.30.20.11
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo &&
-      mkdir -p /var/run/sshd /opt/finance_docs &&
-      /usr/sbin/sshd -D"
 
+  # ==========================================
+  # APPLICATION SERVER
+  # ==========================================
   srv-app-01:
     image: rockylinux:9
     container_name: srv-app-01
     hostname: srv-app-01
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "dnf install -y
+      openssh-server
+      openssh-clients
+      sudo
+      python3 &&
+      mkdir -p /var/run/sshd &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       corp_net:
         ipv4_address: 172.30.20.20
-    command: >
-      bash -c "dnf install -y openssh-server sudo python3 &&
-      ssh-keygen -A &&
-      /usr/sbin/sshd -D"
 
-
-  # --- PIIRATUD TSOON (dmz_iot: 172.30.30.0/24) ---
-
+  # ==========================================
+  # LOBBY KIOSK
+  # ==========================================
   kiosk-lobby:
     image: debian:12
     container_name: kiosk-lobby
     hostname: kiosk-lobby
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      openssh-server
+      openssh-client
+      python3 &&
+      id kioskuser >/dev/null 2>&1 || useradd -m -s /bin/bash kioskuser;
+      mkdir -p /var/run/sshd;
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.10
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server python3 &&
-      useradd -m -s /bin/bash kioskuser &&
-      mkdir -p /var/run/sshd &&
-      /usr/sbin/sshd -D"
 
+  # ==========================================
+  # IOT SENSOR
+  # ==========================================
   iot-sensor-1:
     image: alpine:latest
     container_name: iot-sensor-1
     hostname: iot-sensor-1
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apk add --no-cache openssh python3 &&
+      mkdir -p /var/run/sshd &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.20
-    command: >
-      sh -c "apk add --no-cache openssh python3 &&
-      ssh-keygen -A &&
-      /usr/sbin/sshd &&
-      while true; do echo \"$$(date '+%Y-%m-%d %H:%M:%S') - TEMP: $$((20 + RANDOM % 10)).$$((RANDOM % 10)) C\" >> /var/log/sensor.log; sleep 60; done"
 
+  # ==========================================
+  # IOT CAMERA
+  # ==========================================
   iot-cam-1:
     image: debian:bookworm-slim
     container_name: iot-cam-1
     hostname: iot-cam-1
+    environment:
+      SSH_ROLE: worker
+    volumes:
+      - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ssh_exchange:/ssh-exchange
+    command: >
+      sh -c "apt-get update &&
+      DEBIAN_FRONTEND=noninteractive apt-get install -y
+      openssh-server
+      openssh-client
+      python3 &&
+      exec /bin/sh /usr/local/bin/ssh-init.sh"
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.21
-    command: >
-      bash -c "apt-get update && 
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server python3 &&
-      mkdir -p /var/run/sshd &&
-      echo 'root:admin123' | chpasswd &&
-      sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
-      /usr/sbin/sshd -D"
 
+# ==========================================
+# NETWORKS
+# ==========================================
 networks:
   mgmt_net:
     driver: bridge
     ipam:
       config:
         - subnet: 172.30.10.0/24
+
   corp_net:
     driver: bridge
     ipam:
       config:
         - subnet: 172.30.20.0/24
+
   dmz_iot:
     driver: bridge
     ipam:
       config:
         - subnet: 172.30.30.0/24
 
+# ==========================================
+# VOLUMES
+# ==========================================
 volumes:
   backup_data:
+  ssh_exchange:
+
