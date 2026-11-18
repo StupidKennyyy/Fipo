@@ -11,13 +11,14 @@ services:
       SSH_ROLE: controller
     ports:
       - "8080:8080"
-  volumes:
+    volumes:
       - ./cmdb-dashboard:/var/www/html
       - ./hosts.ini:/etc/ansible/hosts:ro
       - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
       - ./scripts/run-playbooks.sh:/usr/local/bin/run-playbooks.sh:ro
       - ./playbooks:/opt/fipo/playbooks
       - ssh_exchange:/ssh-exchange
+      - controller_ssh:/root/.ssh
     command: >
       sh -c "apt-get update &&
       DEBIAN_FRONTEND=noninteractive apt-get install -y
@@ -31,6 +32,17 @@ services:
       sed -i 's/listen \[::\]:80 default_server;/listen [::]:8080 default_server;/' /etc/nginx/sites-available/default &&
       nginx &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          test -f /root/.ssh/controller-ready &&
+          ssh-keygen -y -f /root/.ssh/id_ed25519 > /tmp/controller.pub &&
+          cmp -s /tmp/controller.pub /ssh-exchange/controller.pub
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
     networks:
       mgmt_net:
         ipv4_address: 172.30.10.10
@@ -65,6 +77,9 @@ services:
       borgbackup
       python3 &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       mgmt_net:
         ipv4_address: 172.30.10.20
@@ -92,6 +107,9 @@ services:
       vim
       htop &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       corp_net:
         ipv4_address: 172.30.20.10
@@ -116,6 +134,9 @@ services:
       sudo
       python3 &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       corp_net:
         ipv4_address: 172.30.20.11
@@ -140,6 +161,9 @@ services:
       python3 &&
       mkdir -p /var/run/sshd &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       corp_net:
         ipv4_address: 172.30.20.20
@@ -165,6 +189,9 @@ services:
       id kioskuser >/dev/null 2>&1 || useradd -m -s /bin/bash kioskuser;
       mkdir -p /var/run/sshd;
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.10
@@ -185,6 +212,9 @@ services:
       sh -c "apk add --no-cache openssh python3 &&
       mkdir -p /var/run/sshd &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.20
@@ -208,6 +238,9 @@ services:
       openssh-client
       python3 &&
       exec /bin/sh /usr/local/bin/ssh-init.sh"
+    depends_on:
+      hq-controller:
+        condition: service_healthy
     networks:
       dmz_iot:
         ipv4_address: 172.30.30.21
@@ -240,4 +273,5 @@ networks:
 volumes:
   backup_data:
   ssh_exchange:
+  controller_ssh:
 
