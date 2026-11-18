@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Fipo
 
 **Fipo** on Docker Compose'i abil loodud konteineripõhine ettevõtte IT-infrastruktuuri simulatsioon. Projekti eesmärk on luua väike virtuaalne ettevõtte võrk, kus erinevaid Linuxi süsteeme saab keskselt hallata, monitoorida ja turvalisemaks muuta.
@@ -177,4 +176,3 @@ Playbook kaustas peaks olema konfiguratsioonid kõikide "piltide" jaoks.
 
 Ansible on paigaldatud, et kiiresti automatiseerida konfiguratsiooni või varukoopiate tegemist.
 
->>>>>>> origin/main
