@@ -11,10 +11,12 @@ services:
       SSH_ROLE: controller
     ports:
       - "8080:8080"
-    volumes:
+  volumes:
       - ./cmdb-dashboard:/var/www/html
       - ./hosts.ini:/etc/ansible/hosts:ro
       - ./ssh/ssh-init.sh:/usr/local/bin/ssh-init.sh:ro
+      - ./scripts/run-playbooks.sh:/usr/local/bin/run-playbooks.sh:ro
+      - ./playbooks:/opt/fipo/playbooks
       - ssh_exchange:/ssh-exchange
     command: >
       sh -c "apt-get update &&
