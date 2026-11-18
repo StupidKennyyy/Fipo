@@ -64,5 +64,36 @@ EOF
 sshd -t
 
 echo "SSH server käivitub..."
-exec /usr/sbin/sshd -D -e
+/usr/sbin/sshd
 
+echo "Ootan hallatavate masinate SSH ühendusi..."
+
+for host in \
+    172.30.10.20 \
+    172.30.20.10 \
+    172.30.20.11 \
+    172.30.20.20 \
+    172.30.30.10 \
+    172.30.30.20
+do
+    echo "Ootan hosti $host..."
+
+    until ssh \
+        -o BatchMode=yes \
+        -o ConnectTimeout=3 \
+        -o StrictHostKeyChecking=no \
+        "root@$host" true 2>/dev/null
+    do
+        sleep 2
+    done
+
+    echo "$host on valmis."
+done
+
+echo "Käivitan Ansible playbook'id..."
+
+/usr/local/bin/run-playbooks.sh
+
+echo "Kõik automaatsed playbook'id on käivitatud."
+
+exec /usr/sbin/sshd -D -e
